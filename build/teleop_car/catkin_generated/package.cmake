@@ -1,0 +1,7 @@
+set(_CATKIN_CURRENT_PACKAGE "teleop_car")
+set(teleop_car_MAINTAINER "nuc <nuc@todo.todo>")
+set(teleop_car_DEPRECATED "")
+set(teleop_car_VERSION "0.0.0")
+set(teleop_car_BUILD_DEPENDS "roscpp" "std_msgs")
+set(teleop_car_RUN_DEPENDS "roscpp" "std_msgs")
+set(teleop_car_BUILDTOOL_DEPENDS "catkin")

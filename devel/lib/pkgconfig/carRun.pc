@@ -1,0 +1,8 @@
+prefix=/home/nuc/catkin_ws/devel
+
+Name: carRun
+Description: Description of carRun
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/nuc/catkin_ws/devel/lib 
+Requires: 

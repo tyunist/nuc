@@ -1,0 +1,7 @@
+set(_CATKIN_CURRENT_PACKAGE "simple")
+set(simple_MAINTAINER "nuc <nuc@todo.todo>")
+set(simple_DEPRECATED "")
+set(simple_VERSION "0.0.0")
+set(simple_BUILD_DEPENDS "roscpp" "rospy" "std_msgs")
+set(simple_RUN_DEPENDS "roscpp" "rospy" "std_msgs")
+set(simple_BUILDTOOL_DEPENDS "catkin")

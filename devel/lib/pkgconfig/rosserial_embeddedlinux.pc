@@ -1,0 +1,8 @@
+prefix=/home/nuc/catkin_ws/devel
+
+Name: rosserial_embeddedlinux
+Description: Description of rosserial_embeddedlinux
+Version: 0.5.5
+Cflags: 
+Libs: -L/home/nuc/catkin_ws/devel/lib 
+Requires: 

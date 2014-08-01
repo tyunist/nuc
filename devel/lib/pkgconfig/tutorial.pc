@@ -1,0 +1,8 @@
+prefix=/home/nuc/catkin_ws/devel
+
+Name: tutorial
+Description: Description of tutorial
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/nuc/catkin_ws/devel/lib 
+Requires: 
