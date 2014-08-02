@@ -1,5 +1,6 @@
 /* carRun.cpp
-   Version 1.0
+   Version 2.0
+	last edited 6:30AM_01/08/2014 by tynguyen
 	tynguyen@unist.ac.kr
 
 */
@@ -22,47 +23,23 @@
 #include <signal.h>
 #include <termios.h>
 #include <stdio.h>
-#include <sstream>
+#include <sstream> /// istringstream
+#include "Timer.h"
+#include "UdpServer.h"
 
-
+#include <fstream>
+#include <vector>
 #define BUFSIZE 2048
 #define SERVICE_PORT 21234
+#define TIMEOUT = 10000 /// 10 miliseconds
 using namespace std;
 
 
 int main(int argc, char **argv)
 {
 	/* server setup */
-	struct timeval tv; /// timeout struct
-	tv.tv_sec = 0;
-	tv.tv_usec = 10000;
-	struct sockaddr_in myaddr;	/// our address
-	struct sockaddr_in remaddr; ///remote address 
-	socklen_t addrlen = sizeof(remaddr); ///length of addresses
-	int recvlen;			/// bytes received 
-	int fd;				/// our socket
-	int msgcnt = 0;		/// count # of messages we received 
-	char buf[BUFSIZE];	/// receive buffer 
-
-
-	/// create a UDP socket
-
-	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-		perror("cannot create socket\n");
-		return 0;
-	}
-
-	/// bind the socket to any valid IP address and a specific port
-
-	memset((char *)&myaddr, 0, sizeof(myaddr));
-	myaddr.sin_family = AF_INET;
-	myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	myaddr.sin_port = htons(SERVICE_PORT);
-
-	if (bind(fd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0) {
-		perror("bind failed");
-		return 0;
-	}
+	UdpServer server(SERVICE_PORT);
+	server.connect();
 
 		
 	/* Setup ROS control*/	
@@ -87,43 +64,111 @@ int main(int argc, char **argv)
 	strPub.publish(ang);	
 	
 	/// Variables to store received data from client
-	float x, y, velX, velY, dirAngle;
+	float x, y, velX, velY, dirAngle, circleTime;
 	double sentTime;
+	int errorNum = 0; /// Number of bad packages 
+	int countNum = 0;
+	Timer timer;
+	timer.start();
+	
+	/// File and vector to store velocity
+	ofstream fVelResponses("velResponse.csv");
+	if(fVelResponses.fail())
+    {
+        cout<<"File ERROR!!! Could not open fVelResponses File!"<<endl;
+        exit(1);
+    }
 
+	vector<vector<double> > velResponses;
+	
 
 	/* now loop, receiving data of car's velocity and process them */
-	for (;;) {
+	while(true) {
+		double currSample = timer.stop();
 		ROS_INFO("Cirle %d start!", count + 1);	
-		setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(struct timeval) );
-
-		printf("waiting on port %d\n", SERVICE_PORT);
-		recvlen = recvfrom(fd, buf, BUFSIZE, 0, (struct sockaddr *)&remaddr, &addrlen);
-		if (recvlen > 0) {
-			buf[recvlen] = 0;
-			printf("Received message: \"%s\" (%d bytes)\n", buf, recvlen);
-			/// Extract infor from buf
-			istringstream isBuf(buf);
-			isBuf >> x >> y >> velX >> velY >> dirAngle >> sentTime;
-			ROS_INFO("Disembled data: x =  %f y = %f velX = %f velY = %f sentTime = %.3f", x, y, velX, velY, sentTime);
-                        string startS, endS;
-			if(startS.compare(string("start") ) != 0 || endS.compare(string("end")) != 0 ) /// string is bad
-				continue; 
-			cout<<"Extracted information: "<<x<<endl;
-			cout<<velX<<endl;
-			cout<<sentTime<<endl;
-		}
-		else
-			printf("uh oh - something went wrong!\n");
+		/// Buffer to store information getting from the client
+		char buf[2048];
+	
+		if(count > 0)   /// mean that from the second time of receving, just wait a few miliseconds
+			buf = server.receive(timeout);
+		else buf = server.receive();
 		
-		///Send acknowledge to client
-		sprintf(reinterpret_cast<char*>(buf), "ack %d", msgcnt++);
-		printf("Server response: \"%s\"\n", buf);
-
-		if (sendto(fd, buf, strlen(reinterpret_cast<const char*>(buf) ), 0, (struct sockaddr *)&remaddr, addrlen) )
-		{}	
-		/// Delay for a while to see how'll happen
-
-	}
-	/* never exits */
+		/// Extract infor from buf
+		istringstream isBuf(buf);
+	 	string startS, endS;
+		isBuf >> startS >> x >> y >> velX >> velY >> dirAngle >> sentTime >> circleTime >>endS;
+		ROS_INFO("Disembled data: x =  %f y = %f velX = %f velY = %f dirAngle = %f sentTime = %.3f circleTime = %.3f", x, y, velX, velY, dirAngle, sentTime, circleTime);
+		/// Printout infor to std
+		cout<<"Extracted information: "<<x<<endl;
+		cout<<velX<<endl;
+		cout<<"Sent time: "<<sentTime<<endl;
+		double now = timer.now();
+		cout<<"NUC time: ";
+		timer.printTime(now);
+		/// Save infor to vector
+		vector<double> velResponse;
+		velResponse.push_back(x, y, velX, velY, dirAngle, sentTime, circleTime)l
+		velResponses.push_back(velResponse);
+		/// Save infor to file
+		
+		
+		if(startS.compare(string("start") ) != 0 || endS.compare(string("end")) != 0 ) /// string is bad
+			{
+				cout<<"Gotten string is bad!! It is: "<<isBuf<<endl;
+				errorNum +=1;
+			}
+		/// Get velocity of previous period of time
+		
+		
+		/// Control car with new velocity
+		if(startS.compare(string("stop") ) == 0 )
+		{
+			vel.data = 0;
+			velPub.publish(vel);
+			ROS_INFO("%d: %f", count, vel.data);	
+			cout<<"STOP by client!!!Stopping..."<<endl;
+			break;
+		}
+		
+		else 
+		{
+			if(vel.data == 0)
+			{
+				vel.data = 90;
+				velPub.publish(vel);
+				ros::Duration(0.2).sleep(); // sleep for half a second
+				vel.data = 80;
+				velPub.publish(vel);
+				ros::Duration(0.2).sleep();
+				vel.data = 1;
+				velPub.publish(vel);
+				ROS_INFO("%d: %f", count, vel.data);
+			}
+			else
+			{
+				vel.data = 1;
+				velPub.publish(vel);
+				ROS_INFO("%d: %f", count, vel.data);
+			}
+			countNum += 1;
+		}
+		
+		
+		/// update ros messages		
+		ros::spinOnce();
+		loop_rate.sleep();
+		cout +=1;
+	} /// end of while(true)
+		
+	
+	/// Exit program
+	vel.data = 0;
+	ROS_INFO("%d: %f", count, vel.data);
+	velPub.publish(vel);
+	
+	cout<<"****End of the program****"<<endl;
+	cout<<"Successful frames: "<<countNum<<endl;
+	cout<<"Error frames (bad gotten package from client): "<<errorNum<<endl;
+	cout<<"Error rate ( Error / total): "<<errorNum/(errorNum + countNum)* 100<<"%"<<endl;
 	return 0;
 }
