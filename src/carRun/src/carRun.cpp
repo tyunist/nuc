@@ -29,18 +29,18 @@
 
 #include <fstream>
 #include <vector>
-#define BUFSIZE 2048
-#define SERVICE_PORT 21234
-#define TIMEOUT = 10000 /// 10 miliseconds
+#include <iomanip> /// Format cout<<
 using namespace std;
 
+/// Global constants
+int SERVICE_PORT = 21234;
 
 int main(int argc, char **argv)
 {
 	/* server setup */
 	UdpServer server(SERVICE_PORT);
 	server.connect();
-
+   int timeout = 10000; /// 10 miliseconds
 		
 	/* Setup ROS control*/	
 	ros::init(argc, argv, "carRun");
@@ -53,7 +53,7 @@ int main(int argc, char **argv)
 
 	ros::Rate loop_rate(10);
 
-	int count = 0;
+	int circleNum = 0;
 	std_msgs::Float64 vel;
 	std_msgs::Float64 ang;
 	std_msgs::Float64 idle;
@@ -62,17 +62,33 @@ int main(int argc, char **argv)
 	idle.data = 1;
 	loop_rate.sleep();
 	strPub.publish(ang);	
+
+	/* Running condition: setpoints*/
+	double velSet;
+
+	if(argc < 2) 
+		velSet = 5;
+	else if (argc == 2)
+	{
+		sscanf(argv[1], "%lf", &velSet);
+	}
+	else 
+	{
+		ROS_INFO("Two many arguments");
+		ROS_INFO("Right usage is: carRun velSet");
+		return 0;
+	}
 	
 	/// Variables to store received data from client
-	float x, y, velX, velY, dirAngle, circleTime;
-	double sentTime;
+	double x, y, velX, velY, dirAngle, sentTime, circleTime;
 	int errorNum = 0; /// Number of bad packages 
 	int countNum = 0;
 	Timer timer;
 	timer.start();
 	
 	/// File and vector to store velocity
-	ofstream fVelResponses("velResponse.csv");
+	ofstream fVelResponses;("velResponse.csv");
+	fVelResponses.setf(ios::fixed); /// Floating point numbers are printed in fixed-point notation
 	if(fVelResponses.fail())
     {
         cout<<"File ERROR!!! Could not open fVelResponses File!"<<endl;
@@ -80,95 +96,103 @@ int main(int argc, char **argv)
     }
 	/// Write header
 	fVelResponses << "X" << "\t" << "Y" << "\t" << "VELX" << "\t" << "VELY"
-				  << "dirAngle" << "\t" << "sentTime" << "\t" << "circleTime";
+				  << "dirAngle" << "\t" << "sentTime" << "\t" << "circleTime"<< endl;
 	vector<vector<double> > velResponses;
 	
 
 	/* now loop, receiving data of car's velocity and process them */
 	while(true) {
 		double currSample = timer.stop();
-		ROS_INFO("Cirle %d start!", count + 1);	
+		ROS_INFO("Cirle %d start!", circleNum + 1);	
 		/// Buffer to store information getting from the client
-		char buf[2048];
+		char* buf = new char[2048];
 	
-		if(count > 0)   /// mean that from the second time of receving, just wait a few miliseconds
+		if(circleNum > 0)   /// mean that from the second time of receving, just wait a few miliseconds
 			buf = server.receive(timeout);
 		else buf = server.receive();
-		
+		double receiveTime = timer.now();
+
+		circleNum += 1;
 		/// Extract infor from buf
 		istringstream isBuf(buf);
 	 	string startS, endS;
-		isBuf >> startS >> x >> y >> velX >> velY >> dirAngle >> sentTime >> circleTime >>endS;
+		isBuf >> startS >> x >> y >> velX >> velY >> dirAngle >> sentTime >> circleTime >> endS;
 		ROS_INFO("Disembled data: x =  %f y = %f velX = %f velY = %f dirAngle = %f sentTime = %.3f circleTime = %.3f", x, y, velX, velY, dirAngle, sentTime, circleTime);
 		/// Printout infor to std
-		cout<<"Extracted information: "<<x<<endl;
-		cout<<velX<<endl;
-		cout<<"Sent time: "<<sentTime<<endl;
-		double now = timer.now();
-		cout<<"NUC time: ";
-		timer.printTime(now);
-		/// Save infor to vector
-		vector<double> velResponse;
-		velResponse.push_back(x, y, velX, velY, dirAngle, sentTime, circleTime);
+		ROS_INFO("Extracted information: X: %f", x);
+		ROS_INFO("VELX: %f", velX);
+		ROS_INFO("Sent time: %.3f", sentTime);
+		ROS_INFO("NUC time when receiving: %.3f",receiveTime);
+		
+		/// If message is STOP, stop running
+		if(startS.compare(string("stop") ) == 0 )
+		{
+			vel.data = 0;
+			velPub.publish(vel);
+			ROS_INFO("FORCE: %f",vel.data);	
+			ROS_INFO("STOP by client!!!Stopping...");
+			break;
+		}
+
+		/// If message is wrong, do not save, just continue running
+		if(startS.compare(string("start") ) != 0 || endS.compare(string("end")) != 0 ) /// string is bad
+		{
+				cout<<"Gotten string is bad!! It is: "<<isBuf<<endl;
+				errorNum +=1;
+		
+		/// Get velocity of previous period of time
+		
+		}
+
+		/// Else, save infor to vector and file
+		else
+		{
+		double arr[] = {x, y, velX, velY, dirAngle, sentTime, circleTime};
+		vector<double> velResponse(arr, arr + 7);
 		velResponses.push_back(velResponse);
 		/// Save infor to file
 		fVelResponses << x << "\t" << y << "\t" 
 					  << velX << "\t" << velY <<"\t"
 					  << dirAngle << "\t" << sentTime << "\t"
-					  << circleTime; 
+					  << circleTime << endl; 
 		
-		if(startS.compare(string("start") ) != 0 || endS.compare(string("end")) != 0 ) /// string is bad
-			{
-				cout<<"Gotten string is bad!! It is: "<<isBuf<<endl;
-				errorNum +=1;
-			}
-		/// Get velocity of previous period of time
+		countNum += 1;
+		}
 		
 		
 		/// Control car with new velocity
-		if(startS.compare(string("stop") ) == 0 )
+	
+		if(vel.data == 0)
 		{
-			vel.data = 0;
+			vel.data = 90;
 			velPub.publish(vel);
-			ROS_INFO("%d: %f", count, vel.data);	
-			cout<<"STOP by client!!!Stopping..."<<endl;
-			break;
+			ros::Duration(0.2).sleep(); // sleep for half a second
+			vel.data = 80;
+			velPub.publish(vel);
+			ros::Duration(0.2).sleep();
+			vel.data = velSet;
+			velPub.publish(vel);
+			ROS_INFO("FORCE: %f", vel.data);
+		}
+		else
+		{
+			vel.data = velSet;
+			velPub.publish(vel);
+			ROS_INFO("FORCE: %f", vel.data);
 		}
 		
-		else 
-		{
-			if(vel.data == 0)
-			{
-				vel.data = 90;
-				velPub.publish(vel);
-				ros::Duration(0.2).sleep(); // sleep for half a second
-				vel.data = 80;
-				velPub.publish(vel);
-				ros::Duration(0.2).sleep();
-				vel.data = 1;
-				velPub.publish(vel);
-				ROS_INFO("%d: %f", count, vel.data);
-			}
-			else
-			{
-				vel.data = 1;
-				velPub.publish(vel);
-				ROS_INFO("%d: %f", count, vel.data);
-			}
-			countNum += 1;
-		}
+	
 		
 		
 		/// update ros messages		
 		ros::spinOnce();
 		loop_rate.sleep();
-		cout +=1;
 	} /// end of while(true)
 		
 	
 	/// Exit program
 	vel.data = 0;
-	ROS_INFO("%d: %f", count, vel.data);
+	ROS_INFO("FORCE: %f", vel.data);
 	velPub.publish(vel);
 	
 	cout<<"****End of the program****"<<endl;

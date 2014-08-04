@@ -36,8 +36,8 @@ class UdpServer{
 		
 		struct sockaddr_in myaddr, remaddr;
 		int fd, port, sentNum; /// fd: socket
-		socklen_t slen=sizeof(remaddr);
-		int buflen = 2048; /// Lenth of buffer
+		socklen_t slen;
+		int buflen; /// Lenth of buffer
 		char buf[2048];	/* message buffer */
 		int recvlen;		/* # bytes in acknowledgement message */
 	

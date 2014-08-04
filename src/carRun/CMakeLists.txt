@@ -164,5 +164,5 @@ include_directories(
 	
 include_directories(include ${catkin_INCLUDE_DIRS})
 
-add_executable(carRun src/carRun.cpp src/Timer.cpp src/Udpserver.cpp)
+add_executable(carRun src/carRun.cpp src/Timer.cpp src/UdpServer.cpp)
 target_link_libraries(carRun ${catkin_LIBRARIES} ${curses++_LIBRARIES})

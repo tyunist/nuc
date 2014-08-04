@@ -15,8 +15,6 @@
  * 				Print time duration: 
  									Timer::timer.printTime(duration);
  */
-#ifndef _Timer_h_
-#define _Timer_h_
  
 #include <iostream>
 /// ROS include files
@@ -34,7 +32,7 @@ using namespace std;
 
 void Timer::start()
 {
-	end = ros::Time::now();
+	this->end = ros::Time::now();
 }
 
 double Timer:: now()
@@ -44,16 +42,16 @@ double Timer:: now()
 
 double Timer::elapse()
 {
-	ros::Time current = ros::Time::now()
-	double elapsedTime = current.toSec() - elapsed.toSec();
-	elapsed = current;
+	ros::Time current = ros::Time::now();
+	double elapsedTime = current.toSec() - this->elapsed.toSec();
+	this->elapsed = current;
 	return elapsedTime;
 }
 
 double Timer::stop()
 {
-	end = ros::Time::now();
-	double duration = end.toSec() - start.toSec();
+	this->end = ros::Time::now();
+	double duration = this->end.toSec() - this->begin.toSec();
 	return duration;
 }
 
@@ -63,4 +61,3 @@ void Timer::printTime(double duration)
 }
 
 
-#endif

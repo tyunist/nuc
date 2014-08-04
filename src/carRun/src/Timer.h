@@ -32,7 +32,7 @@ using namespace std;
 
 class Timer{
 	public:
-		ros::Time start, end;
+		ros::Time begin, end;
 		ros::Time elapsed;
 
 		void start();
