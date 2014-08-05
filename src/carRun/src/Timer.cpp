@@ -32,7 +32,8 @@ using namespace std;
 
 void Timer::start()
 {
-	this->end = ros::Time::now();
+	this->begin = ros::Time::now();
+	this->elapsed = this->begin;
 }
 
 double Timer:: now()

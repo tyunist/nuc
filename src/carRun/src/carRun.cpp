@@ -1,6 +1,6 @@
 /* carRun.cpp
    Version 2.0
-	last edited 6:30AM_01/08/2014 by tynguyen
+	last edited 12:30PM_05/08/2014 by tynguyen
 	tynguyen@unist.ac.kr
 
 */
@@ -40,7 +40,7 @@ int main(int argc, char **argv)
 	/* server setup */
 	UdpServer server(SERVICE_PORT);
 	server.connect();
-   int timeout = 10000; /// 10 miliseconds
+   int timeout = 4000000; /// 10 miliseconds
 		
 	/* Setup ROS control*/	
 	ros::init(argc, argv, "carRun");
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
 	ros::Publisher strPub = n.advertise<std_msgs::Float64>("controlS", 64);
 	ros::Publisher idlePub = n.advertise<std_msgs::Float64>("controlI", 64);
 
-	ros::Rate loop_rate(10);
+	ros::Rate loop_rate(100);
 
 	int circleNum = 0;
 	std_msgs::Float64 vel;
@@ -96,7 +96,7 @@ int main(int argc, char **argv)
     }
 	/// Write header
 	fVelResponses << "X" << "\t" << "Y" << "\t" << "VELX" << "\t" << "VELY"
-				  << "dirAngle" << "\t" << "sentTime" << "\t" << "circleTime"<< endl;
+				  << "dirAngle" << "\t" << "sentTime" << "\t" << "circleTime"<< "\n";
 	vector<vector<double> > velResponses;
 	
 
@@ -106,7 +106,7 @@ int main(int argc, char **argv)
 		ROS_INFO("Cirle %d start!", circleNum + 1);	
 		/// Buffer to store information getting from the client
 		char* buf = new char[2048];
-	
+		ROS_INFO("Start new frame at %.3f", timer.now() );	
 		if(circleNum > 0)   /// mean that from the second time of receving, just wait a few miliseconds
 			buf = server.receive(timeout);
 		else buf = server.receive();
@@ -123,7 +123,10 @@ int main(int argc, char **argv)
 		ROS_INFO("VELX: %f", velX);
 		ROS_INFO("Sent time: %.3f", sentTime);
 		ROS_INFO("NUC time when receiving: %.3f",receiveTime);
-		
+	   ROS_INFO("Circle time: %.3f", circleTime);
+		/// NUC circle time: (difference between two loops)
+		double circleTime2 = timer.elapse();
+		ROS_INFO("NUC circle time: %.3f", circleTime2);
 		/// If message is STOP, stop running
 		if(startS.compare(string("stop") ) == 0 )
 		{
@@ -154,14 +157,14 @@ int main(int argc, char **argv)
 		fVelResponses << x << "\t" << y << "\t" 
 					  << velX << "\t" << velY <<"\t"
 					  << dirAngle << "\t" << sentTime << "\t"
-					  << circleTime << endl; 
+					  << circleTime << "\n"; 
 		
 		countNum += 1;
 		}
 		
 		
 		/// Control car with new velocity
-	
+		ROS_INFO("CONTROL AT: %.3f", timer.now() );	
 		if(vel.data == 0)
 		{
 			vel.data = 90;
@@ -187,6 +190,7 @@ int main(int argc, char **argv)
 		/// update ros messages		
 		ros::spinOnce();
 		loop_rate.sleep();
+		ROS_INFO("ENd control at: %.3f", timer.now() );
 	} /// end of while(true)
 		
 	
@@ -199,5 +203,7 @@ int main(int argc, char **argv)
 	cout<<"Successful frames: "<<countNum<<endl;
 	cout<<"Error frames (bad gotten package from client): "<<errorNum<<endl;
 	cout<<"Error rate ( Error / total): "<<errorNum/(errorNum + countNum)* 100<<"%"<<endl;
+	ROS_INFO("END time: %.3f", timer.now() );
+	ROS_INFO("Running time: %.3f", timer.stop() );
 	return 0;
 }
