@@ -161,7 +161,7 @@ int main(int argc, char **argv)
 		
 				/// Get velocity of previous period of time
 				if(velResponses.size() ) 
-					velEstimated = velResponses.back()[3];
+					velEstimated = velResponses.back()[4];
 				else velEstimated = 0;
 		}
 
@@ -173,28 +173,17 @@ int main(int argc, char **argv)
 			double velEstimated;
 			if(velResponses.size() >= 1) 
 			{
-				currSample = timer.now() - velResponses[0][10] ; /// - receiveTime 1st
-				cout<<"Paramter to estimate vel:"<<velX<<" "<<currSample<<" "<<circleTime<<" "<<velResponses.back()[0]<<" "<<velResponses.back()[3]<<endl;
-				velEstimated = velX + (currSample - circleTime - velResponses.back()[0])* (velX - velResponses.back()[3] ) / circleTime;
-			/// In general, it should be vel rather than velX
-
+				velEstimated = velX + (currSample - circleTime - velResponses.back()[8])* (velX - velResponses.back()[4] ) / circleTime;
+				currSample = timer.now() - velResponses[0][7] ; /// - receiveTime 1st
 			}	
-			else
+			else 
 			{
+				velEstimated = (currSample*velX)/circleTime; /// In general, it should be vel rather than velX
 				currSample = 0;
-				velEstimated = 0; 			}
-			
-			/// Scheduled points
-			if(currSample > 1.5)
-				velSet = 0.5;
-			if(currSample > 2)
-				velSet = 1.5;
-			if(currSample > 2.5)
-				velSet = 0.5;
-
+			}
 			/// Save infor to vector
-			double arr[] = {currSample, velSet, velX, velEstimated, x, y, velX, velY,  dirAngle, sentTime, receiveTime, circleTime};
-			vector<double> velResponse(arr, arr + 12);
+			double arr[] = {x, y, velX, velY, velEstimated, dirAngle, sentTime, receiveTime, currSample, circleTime};
+			vector<double> velResponse(arr, arr + 9);
 			velResponses.push_back(velResponse);
 			/// Save infor to file
 			fVelResponses << currSample << "\t"<< velSet << "\t"
@@ -215,24 +204,24 @@ int main(int argc, char **argv)
 		double cmd = pid.Update(velDelta, circleTime);
 		ROS_INFO("CONTROL AT: %.3f", timer.now() );	
 		/// Imploy command to arduino
-		///if(vel.data == 0)
-		///{
-		///	vel.data = 90;
-		///	velPub.publish(vel);
-		///	ros::Duration(0.2).sleep(); // sleep for half a second
-		///	vel.data = 80;
-		///	velPub.publish(vel);
-		///	ros::Duration(0.2).sleep();
-		///	vel.data = cmd;
-		///	velPub.publish(vel);
-		///	ROS_INFO("FORCE: %f", vel.data);
-		///}
-		///else
-		///{
+		if(vel.data == 0)
+		{
+			vel.data = 90;
+			velPub.publish(vel);
+			ros::Duration(0.2).sleep(); // sleep for half a second
+			vel.data = 80;
+			velPub.publish(vel);
+			ros::Duration(0.2).sleep();
 			vel.data = cmd;
 			velPub.publish(vel);
 			ROS_INFO("FORCE: %f", vel.data);
-		///}
+		}
+		else
+		{
+			vel.data = cmd;
+			velPub.publish(vel);
+			ROS_INFO("FORCE: %f", vel.data);
+		}
 		
 	
 		
