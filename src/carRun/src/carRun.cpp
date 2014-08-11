@@ -1,7 +1,7 @@
 /* carRun.cpp
    Version 2.1
    	* Add pid controler
-	last edited 12:16AM_06/08/2014 by tynguyen
+	last edited 10:00AM_09/08/2014 by tynguyen
 	tynguyen@unist.ac.kr
 
 */
@@ -33,6 +33,13 @@
 #include <vector>
 #include <iomanip> /// Format cout<<
 using namespace std;
+
+void adjustPID(PID &pid, double &kp, double &ki)
+{
+	pid.SetPGain(kp);
+	pid.SetIGain(ki);
+}
+
 
 /// Global constants
 int SERVICE_PORT = 21234;
@@ -66,24 +73,43 @@ int main(int argc, char **argv)
 	strPub.publish(ang);	
 
 	/* Running condition: setpoints*/
-	double velSet;
-	double kp = 1;
-	double ki = 0;
-
+	double velSet = 1;
+	double kp = 22;
+	double ki = 3;
+	double akp = 2;
+	double aki = 0.5; 
 	
 	if (argc == 4)
 	{
 		sscanf(argv[1], "%lf", &velSet);
-		sscanf(argv[2], "%lf", &kp);
-		sscanf(argv[3], "%lf", &ki);
+		sscanf(argv[2], "%lf", &akp);
+		sscanf(argv[3], "%lf", &aki);
 	}
-	else
+	else if(argc > 4)
 	{
-		ROS_INFO("Two few/many arguments");
-		ROS_INFO("Right usage is: carRun velSet kp ki");
+		ROS_INFO("Two many arguments");
+		ROS_INFO("Right usage is: carRun velSet akp aki");
 		return 0;
 	}
-	
+	else if(argc == 3)
+	{
+		ROS_INFO("Less than 4 arguments.");
+		sscanf(argv[1], "%lf", &velSet);
+		sscanf(argv[2], "%lf", &akp);
+		ROS_INFO("velSet is %f, akp is %f, aki is default = %f", velSet, akp, aki);
+	}
+	else if(argc == 2)
+	{
+		ROS_INFO("Less than 4 arguments.");
+		sscanf(argv[1], "%lf", &velSet);
+		ROS_INFO("velSet is %f, akp is default = %f, aki is default = %f", velSet, akp, aki);
+	} 
+	else 
+	{
+		ROS_INFO("Less than 4 arguments.");
+		ROS_INFO("velSet is default = %f, akp is default = %f, aki is default = %f", velSet, akp, aki);
+	}
+
 	/* Create a PID controler */
 	PID pid(kp, ki, 0);
 	
@@ -134,7 +160,7 @@ int main(int argc, char **argv)
 		ROS_INFO("VELX: %f", velX);
 		ROS_INFO("Sent time: %.3f", sentTime);
 		ROS_INFO("NUC time when receiving: %.3f",receiveTime);
-	   ROS_INFO("Circle time: %.3f", circleTime);
+    	ROS_INFO("Circle time: %.3f", circleTime);
 		/// NUC circle time: (difference between two loops)
 		double circleTime2 = timer.elapse();
 		ROS_INFO("NUC circle time: %.3f", circleTime2);
@@ -212,6 +238,9 @@ int main(int argc, char **argv)
 		/* Control car with new velocity */
 		/// Get command
 		double velDelta = velEstimated - velSet;
+		/// Adjust PID parameters after car's starting period
+		if( (velEstimated >= velSet + 0.1) && currSample >= 1 )
+			adjustPID(pid, akp, aki);
 		double cmd = pid.Update(velDelta, circleTime);
 		ROS_INFO("CONTROL AT: %.3f", timer.now() );	
 		/// Imploy command to arduino
