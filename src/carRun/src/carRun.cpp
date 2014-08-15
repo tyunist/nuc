@@ -1,7 +1,7 @@
 /* carRun.cpp
    Version 2.1
    	* Add pid controler
-	last edited 10:00AM_09/08/2014 by tynguyen
+	last edited 4:00PM_15/08/2014 by tynguyen
 	tynguyen@unist.ac.kr
 
 */
@@ -46,10 +46,11 @@ int SERVICE_PORT = 21234;
 
 int main(int argc, char **argv)
 {
+	double addVel = 0.05;
 	/* server setup */
 	UdpServer server(SERVICE_PORT);
 	server.connect();
-   int timeout = 4000000; /// 10 miliseconds
+   int timeout = 1000000; /// 1 second
 		
 	/* Setup ROS control*/	
 	ros::init(argc, argv, "carRun");
@@ -73,12 +74,12 @@ int main(int argc, char **argv)
 	strPub.publish(ang);	
 
 	/* Running condition: setpoints*/
-	double velSet = 1;
-	double kp = 22;
-	double ki = 3;
-	double akp = 2;
-	double aki = 0.5; 
-	
+	double velSet = 0.7;
+	double kp = 60;
+	double ki = 65;
+	double akp = 9;
+	double aki = 16; 
+	double cmdPrev = 0;	
 	if (argc == 4)
 	{
 		sscanf(argv[1], "%lf", &velSet);
@@ -101,7 +102,7 @@ int main(int argc, char **argv)
 	else if(argc == 2)
 	{
 		ROS_INFO("Less than 4 arguments.");
-		sscanf(argv[1], "%lf", &velSet);
+		sscanf(argv[1], "%lf", &addVel);
 		ROS_INFO("velSet is %f, akp is default = %f, aki is default = %f", velSet, akp, aki);
 	} 
 	else 
@@ -178,70 +179,67 @@ int main(int argc, char **argv)
 		/* Now, with each received package, we need to estimate the current
 		velocity based on sent velocity */
 		double velEstimated;
+		double currSample;
 		
 		/// If message is wrong, do not save, just continue running
 		if(startS.compare(string("start") ) != 0 || endS.compare(string("end")) != 0 ) /// string is bad
 		{
 				cout<<"Gotten string is bad!! It is: "<<isBuf<<endl;
 				errorNum +=1;
-		
-				/// Get velocity of previous period of time
-				if(velResponses.size() ) 
-					velEstimated = velResponses.back()[3];
-				else velEstimated = 0;
+				continue;
 		}
 
 		
-		else
+		/* Compansate vision-based velocity calculation time delay */
+		if(velResponses.size() >= 2) 
 		{
-			/* Compansate vision-based velocity calculation time delay */
-			double currSample;
-			double velEstimated;
-			if(velResponses.size() >= 1) 
-			{
-				currSample = timer.now() - velResponses[0][10] ; /// - receiveTime 1st
-				cout<<"Paramter to estimate vel:"<<velX<<" "<<currSample<<" "<<circleTime<<" "<<velResponses.back()[0]<<" "<<velResponses.back()[3]<<endl;
-				velEstimated = velX + (currSample - circleTime - velResponses.back()[0])* (velX - velResponses.back()[3] ) / circleTime;
+			currSample = timer.now() - velResponses[0][10] ; /// - receiveTime 1st
+			cout<<"Paramter to estimate vel:"<<velX<<" "<<currSample<<" "<<circleTime<<" "<<velResponses.back()[0]<<" "<<velResponses.back()[3]<<endl;
+			
+			double prevVelEstimated = velResponses.back()[3];
+			double prevCmd = velResponses.back()[12];
+			double prevVel = velResponses.back()[2];
+			double sePrevCmd = velResponses[velResponses.size() - 2][12];
+			if(sePrevCmd == 0)
+				velEstimated = velX;
+			else
+				velEstimated = velX + circleTime2*(prevVelEstimated - prevVel)*prevCmd/sePrevCmd;
 			/// In general, it should be vel rather than velX
 
-			}	
-			else
-			{
-				currSample = 0;
-				velEstimated = 0; 			}
-			
-			/// Scheduled points
-			if(currSample > 1.5)
-				velSet = 0.5;
-			if(currSample > 2)
-				velSet = 1.5;
-			if(currSample > 2.5)
-				velSet = 0.5;
-
-			/// Save infor to vector
-			double arr[] = {currSample, velSet, velX, velEstimated, x, y, velX, velY,  dirAngle, sentTime, receiveTime, circleTime};
-			vector<double> velResponse(arr, arr + 12);
-			velResponses.push_back(velResponse);
-			/// Save infor to file
-			fVelResponses << currSample << "\t"<< velSet << "\t"
-				        << velX << "\t" << velEstimated<<"\t"
-						  << x << "\t"<< y << "\t" 
-						  << velX << "\t" << velY <<"\t"
-						  << dirAngle << "\t" << sentTime << "\t"   
-						  << receiveTime << "\t" << circleTime << "\t"
-						  << endl; 
-			
-			countNum += 1;
+		}	
+		else if(velResponses.size() == 0)
+		{
+			currSample = 0;
+			velEstimated = 0; }
+		else
+		{
+			currSample = timer.now() - velResponses[0][10] ; /// - receiveTime 1st
+			double prevCmd = velResponses.back()[12];
+			double prevVel = velResponses.back()[2];
+			velEstimated = velX + prevCmd/5*circleTime2; 
 		}
+
+		/// Scheduled points
+		if(currSample > 1.5)
+			velSet = 0.7;
+		if(currSample > 2.5)
+			velSet = 0.7;
+		if(currSample > 4)
+			velSet = 0.7;
 		
 		
 		/* Control car with new velocity */
 		/// Get command
 		double velDelta = velEstimated - velSet;
-		/// Adjust PID parameters after car's starting period
-		if( (velEstimated >= velSet + 0.1) && currSample >= 1 )
-			adjustPID(pid, akp, aki);
-		double cmd = pid.Update(velDelta, circleTime);
+		///double velDelta = velX - velSet - addVel;
+		
+		///double cmd = pid.Update(velDelta, circleTime2);
+		/// Adjust PID parameters after cmd <= 0
+		if( currSample > 0.5 && velDelta > 0.1 && cmdPrev <= 0)
+		{};
+			///adjustPID(pid, akp, aki);
+		double cmd = pid.Update(velDelta, circleTime2);
+		cmdPrev = cmd;
 		ROS_INFO("CONTROL AT: %.3f", timer.now() );	
 		/// Imploy command to arduino
 		///if(vel.data == 0)
@@ -263,13 +261,28 @@ int main(int argc, char **argv)
 			ROS_INFO("FORCE: %f", vel.data);
 		///}
 		
-	
-		
-		
 		/// update ros messages		
 		ros::spinOnce();
 		loop_rate.sleep();
 		ROS_INFO("ENd control at: %.3f", timer.now() );
+		
+	    /// Save infor to vector
+		double arr[] = {currSample, velSet, velX, velEstimated, x, y, velX, velY,  dirAngle, sentTime, receiveTime, circleTime2, cmd};
+		vector<double> velResponse(arr, arr + 13);
+		velResponses.push_back(velResponse);
+		/// Save infor to file
+		fVelResponses << currSample << "\t"<< velSet << "\t"
+			        << velX << "\t" << velEstimated<<"\t"
+					  << x << "\t"<< y << "\t" 
+					  << velX << "\t" << velY <<"\t"
+					  << dirAngle << "\t" << sentTime << "\t"   
+					  << receiveTime << "\t" << circleTime << "\t"
+					  /// Add some more for testing
+					  << circleTime2 <<"\t" << velDelta <<"\t"
+					  << cmd
+					  << endl; 
+		
+		countNum += 1;
 	} /// end of while(true)
 		
 	

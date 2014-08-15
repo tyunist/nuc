@@ -94,8 +94,8 @@ char* UdpServer:: receive(int timeout)
 	}
 	else 
 	{
-		printf("NO data");
-		sprintf(this->buf, string("ERROR").c_str());
+		printf("NO data. Going to stop by server!!!");
+		sprintf(this->buf, string("stop").c_str());
 	}
 	return this->buf;				
 }
