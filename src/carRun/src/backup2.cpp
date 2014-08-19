@@ -1,7 +1,7 @@
 /* carRun.cpp
    Version 2.1
    	* Add pid controler
-	last edited 4:00PM_19/08/2014 by tynguyen
+	last edited 4:00PM_15/08/2014 by tynguyen
 	tynguyen@unist.ac.kr
 
 */
@@ -74,21 +74,41 @@ int main(int argc, char **argv)
 	strPub.publish(ang);	
 
 	/* Running condition: setpoints*/
-	double velSet = 0;
-	double setPoint1, setPoint2;
-	double kp = 70;
+	double velSet = 0.7;
+	double kp = 60;
 	double ki = 65;
+	double akp = 9;
+	double aki = 16; 
 	double cmdPrev = 0;	
-	if (argc == 3)
+	if (argc == 4)
 	{
-		sscanf(argv[1], "%lf", &setPoint1);
-		sscanf(argv[2], "%lf", &setPoint2);
+		sscanf(argv[1], "%lf", &velSet);
+		sscanf(argv[2], "%lf", &akp);
+		sscanf(argv[3], "%lf", &aki);
 	}
+	else if(argc > 4)
+	{
+		ROS_INFO("Two many arguments");
+		ROS_INFO("Right usage is: carRun velSet akp aki");
+		return 0;
+	}
+	else if(argc == 3)
+	{
+		ROS_INFO("Less than 4 arguments.");
+		sscanf(argv[1], "%lf", &velSet);
+		sscanf(argv[2], "%lf", &akp);
+		ROS_INFO("velSet is %f, akp is %f, aki is default = %f", velSet, akp, aki);
+	}
+	else if(argc == 2)
+	{
+		ROS_INFO("Less than 4 arguments.");
+		sscanf(argv[1], "%lf", &addVel);
+		ROS_INFO("velSet is %f, akp is default = %f, aki is default = %f", velSet, akp, aki);
+	} 
 	else 
 	{
-		ROS_INFO("Two many or less arguments");
-		ROS_INFO("Right usage is: carRun setPoint1 setPoint2");
-		return 0;
+		ROS_INFO("Less than 4 arguments.");
+		ROS_INFO("velSet is default = %f, akp is default = %f, aki is default = %f", velSet, akp, aki);
 	}
 
 	/* Create a PID controler */
@@ -200,38 +220,46 @@ int main(int argc, char **argv)
 		}
 
 		/// Scheduled points
-		if(currSample <= 1.8)
-			velSet = setPoint1;
-		if(currSample > 1.8)
-			velSet = setPoint2;
+		if(currSample > 1.5)
+			velSet = 0.7;
+		if(currSample > 2.5)
+			velSet = 0.7;
 		if(currSample > 4)
-			velSet = setPoint2;
+			velSet = 0.7;
 		
 		
 		/* Control car with new velocity */
 		/// Get command
-		double velDelta = velEstimated - velSet - 0.05;
+		double velDelta = velEstimated - velSet;
+		///double velDelta = velX - velSet - addVel;
 		
+		///double cmd = pid.Update(velDelta, circleTime2);
 		/// Adjust PID parameters after cmd <= 0
-		if( currSample > 1.0)
+		if( currSample > 0.5 && velDelta > 0.1 && cmdPrev <= 0)
 		{};
 			///adjustPID(pid, akp, aki);
-		double cmdRaw = pid.Update(velDelta, circleTime2);
-	
-		/// Limit cmd (-100 < cmd < 100)
-		double cmd = cmdRaw > 100? 100:(cmdRaw < -100? -100:cmdRaw);
-		
-		/// Compensate for delay
-		if(velDelta > 0 && cmd > 0)
-			cmd = cmd * 1.2;
-		if(velDelta > 0 && cmd < 0)
-			cmd = cmd * 0.7;
-
-		
+		double cmd = pid.Update(velDelta, circleTime2);
+		cmdPrev = cmd;
 		ROS_INFO("CONTROL AT: %.3f", timer.now() );	
-		vel.data = cmd;
-		velPub.publish(vel);
-		ROS_INFO("FORCE: %f", vel.data);
+		/// Imploy command to arduino
+		///if(vel.data == 0)
+		///{
+		///	vel.data = 90;
+		///	velPub.publish(vel);
+		///	ros::Duration(0.2).sleep(); // sleep for half a second
+		///	vel.data = 80;
+		///	velPub.publish(vel);
+		///	ros::Duration(0.2).sleep();
+		///	vel.data = cmd;
+		///	velPub.publish(vel);
+		///	ROS_INFO("FORCE: %f", vel.data);
+		///}
+		///else
+		///{
+			vel.data = cmd;
+			velPub.publish(vel);
+			ROS_INFO("FORCE: %f", vel.data);
+		///}
 		
 		/// update ros messages		
 		ros::spinOnce();
