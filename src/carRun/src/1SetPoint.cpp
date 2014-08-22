@@ -1,9 +1,9 @@
-/* carRun.cpp
-   Version 2.1
-   	* Add pid controler
-   Version 2.2
-   	* Add stable distance calculation
-	last edited 12:31PM_20/08/2014 by tynguyen
+/* 1SetPoint.cpp
+   Version 1.0
+		* Only one setpoint velocity
+   	* pid controler
+   	* stable distance calculation
+	last edited 13:31PM_21/08/2014 by tynguyen
 	tynguyen@unist.ac.kr
 
 */
@@ -79,39 +79,21 @@ int main(int argc, char **argv)
 
 	/* Running condition: setpoints*/
 	double velSet = 0;
-	double setPoint1, setPoint2;
+	double setPoint;
 	double kp = 70;
 	double ki = 65;
 	double cmdPrev = 0;
 	double Tstable = 0;
-	double Tchange = 1.5; /// When to change from setpoin1 -> setpoint2
-	if (argc == 5)
+	if (argc == 3)
 	{
-		sscanf(argv[1], "%lf", &setPoint1);
-		sscanf(argv[2], "%lf", &setPoint2);
-		sscanf(argv[3], "%lf", &Tchange);
-		sscanf(argv[4], "%lf", &Tstable);
-	}
-
-	else if(argc == 3)
-	{
-		sscanf(argv[1], "%lf", &setPoint1);
-		sscanf(argv[2], "%lf", &setPoint2);
-		ROS_INFO("No stable time input, no change time input -> no stable distance computation, start change setpoint at %lf!", Tchange);
-	}
-	
-	else if(argc == 4)
-	{
-		sscanf(argv[1], "%lf", &setPoint1);
-		sscanf(argv[2], "%lf", &setPoint2);
-		sscanf(argv[3], "%lf", &Tchange);
-		ROS_INFO("No stable time input -> no stable distance computation!");
+		sscanf(argv[1], "%lf", &setPoint);
+		sscanf(argv[2], "%lf", &Tstable);
 	}
 
 	else 
 	{
 		ROS_INFO("Two many or less arguments");
-		ROS_INFO("Right usage is: carRun setPoint1 setPoint2 changeTime StableTime");
+		ROS_INFO("Right usage is: carRun setPoint StableTime");
 		return 0;
 	}
 
@@ -144,16 +126,12 @@ int main(int argc, char **argv)
 
 	/// Stable distance 
 	double Dstable = 0;
-	bool calFlag1 = false, calFlag2 = false; /// Flag to notice when calculating
-	double point2At; /// Time to start running at setpoint2 
-	
+	Timer stableTimer; 
+	bool resetFlag = true;
+	int errorCount = 0; /// Count number of error in stable period of setPoint1
 	ofstream fDstable;
 	fDstable.open("Dstable.csv", ios::app);
-    if(fDstable.fail())
-    {
-        cout<<"File ERROR!!! Could not open Dstable.csv File!"<<endl;
-        exit(1);
-    }
+	fDstable << "-------1 setpoint----------"<<endl;
 
 	/* now loop, receiving data of car's velocity and process them */
 	while(true) {
@@ -240,38 +218,25 @@ int main(int argc, char **argv)
 		
 		ROS_INFO("Gonna go to scheduled points");
 		/// Scheduled points
-		if(currSample < Tchange && calFlag1 == false)
-			velSet = setPoint1;
-		else if(calFlag1 == false && velSet == setPoint1)
+		velSet = setPoint1;
+		if(currSample == 0)
 		{
-			velSet = setPoint2;
-			Dstable = x; /// Generally, it should be sqrt(x*2 + y*2)
-			point2At = timer.now();
-			ROS_INFO("Start setpoint2 at %.3lf and position: %f",point2At,x);
-			calFlag1 = true;
+			Dstable = x;
+			ROS_INFO("Start setpoint2 at %.3lf and position: %f", timer.now(),x);
 		}
-		if(calFlag1 == true)
-			ROS_INFO("CalFlag1 now is true");
-		else 
-			ROS_INFO("CalFlag1 now is false");
-		if(timer.now() >= (Tstable + point2At) )
-			ROS_INFO("Still less than Tstable");
-		else 
-			ROS_INFO("Bigger than Tstable");
-		/// Calculate stable distance
-		if(calFlag1 == true && timer.now() >= (Tstable + point2At) && Tstable > 0 && calFlag2 == false)
+
+		if(resetFlag == false && currSample >= Tstable)
 		{
-			Dstable = x - Dstable;
+			Dstable = x - Dstable; /// Generally, it should be sqrt(x*2 + y*2)
 			ROS_INFO("Calculate at %.3lf, position: %f, after stableTime:%.3f  Dstable = %f", timer.now(), x, Tstable, Dstable);
-		   fDstable << setPoint1 << "\t" << setPoint2 << "\t" << Tstable << "\t" << 	Dstable <<endl;
-			calFlag2 = true;
+		   fDstable << 0 << "\t" << setPoint << "\t" << Tstable << "\t" << 	Dstable <<endl;
 		}
 
 		
 		/* Control car with new velocity */
 		/// Get command
 		double velDelta = velEstimated - velSet - 0.05;
-
+		
 		/// Adjust PID parameters after cmd <= 0
 		if( currSample > 1.0)
 		{};

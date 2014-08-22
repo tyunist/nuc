@@ -165,4 +165,12 @@ include_directories(
 include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_executable(carRun src/carRun.cpp src/Timer.cpp src/UdpServer.cpp src/PID.cpp)
+add_executable(1SetPoint src/1SetPoint.cpp src/Timer.cpp src/UdpServer.cpp src/PID.cpp)
+add_executable(2SetPoints src/2SetPoints.cpp src/Timer.cpp src/UdpServer.cpp src/PID.cpp)
+add_executable(3SetPoints src/3SetPoints.cpp src/Timer.cpp src/UdpServer.cpp src/PID.cpp)
+add_executable(keyboardRun src/keyboardRun.cpp src/Timer.cpp src/UdpServer.cpp src/PID.cpp)
 target_link_libraries(carRun ${catkin_LIBRARIES} ${curses++_LIBRARIES})
+target_link_libraries(1SetPoint ${catkin_LIBRARIES} ${curses++_LIBRARIES})
+target_link_libraries(2SetPoint ${catkin_LIBRARIES} ${curses++_LIBRARIES})
+target_link_libraries(3SetPoint ${catkin_LIBRARIES} ${curses++_LIBRARIES})
+target_link_libraries(keyboardRun ${catkin_LIBRARIES} ${curses++_LIBRARIES})

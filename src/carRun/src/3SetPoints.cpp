@@ -1,9 +1,9 @@
-/* carRun.cpp
-   Version 2.1
-   	* Add pid controler
-   Version 2.2
-   	* Add stable distance calculation
-	last edited 12:31PM_20/08/2014 by tynguyen
+/* 3SetPoints.cpp
+   Version 1.0
+   	* 3 Setpoint velocities
+		* pid controler
+   	* aggresively calculate stable distance from setPoint1 to setPoint2 and setPoint1 to setPoint3 in total. 
+	last edited 13:50PM_21/08/2014 by tynguyen
 	tynguyen@unist.ac.kr
 
 */
