@@ -83,35 +83,35 @@ int main(int argc, char **argv)
 	double kp = 70;
 	double ki = 65;
 	double cmdPrev = 0;
-	double Tstable = 0;
-	double Tchange = 1.5; /// When to change from setpoin1 -> setpoint2
+	double Tstable2 = 0;
+	double Tstable1 = 1.5; /// When to change from setpoin1 -> setpoint2
 	if (argc == 5)
 	{
 		sscanf(argv[1], "%lf", &setPoint1);
 		sscanf(argv[2], "%lf", &setPoint2);
-		sscanf(argv[3], "%lf", &Tchange);
-		sscanf(argv[4], "%lf", &Tstable);
+		sscanf(argv[3], "%lf", &Tstable1);
+		sscanf(argv[4], "%lf", &Tstable2);
 	}
 
 	else if(argc == 3)
 	{
 		sscanf(argv[1], "%lf", &setPoint1);
 		sscanf(argv[2], "%lf", &setPoint2);
-		ROS_INFO("No stable time input, no change time input -> no stable distance computation, start change setpoint at %lf!", Tchange);
+		ROS_INFO("No stable time input, no change time input -> no stable distance computation, start change setpoint at %lf!", Tstable1);
 	}
 	
 	else if(argc == 4)
 	{
 		sscanf(argv[1], "%lf", &setPoint1);
 		sscanf(argv[2], "%lf", &setPoint2);
-		sscanf(argv[3], "%lf", &Tchange);
+		sscanf(argv[3], "%lf", &Tstable1);
 		ROS_INFO("No stable time input -> no stable distance computation!");
 	}
 
 	else 
 	{
 		ROS_INFO("Two many or less arguments");
-		ROS_INFO("Right usage is: carRun setPoint1 setPoint2 changeTime StableTime");
+		ROS_INFO("Right usage is: carRun setPoint1 setPoint2 stableTime1 StableTime2");
 		return 0;
 	}
 
@@ -144,12 +144,15 @@ int main(int argc, char **argv)
 
 	/// Stable distance 
 	double Dstable = 0;
-	Timer stableTimer; 
-	bool resetFlag = true;
-	int errorCount = 0; /// Count number of error in stable period of setPoint1
+	bool calFlag1 = false, calFlag2 = false;
 	ofstream fDstable;
 	fDstable.open("Dstable.csv", ios::app);
-
+	if(fDstable.fail())
+	{
+		cout<<"File ERROR!!! Could not open Dstable.csv File!"<<endl;
+        exit(1);
+    }
+	
 
 	/* now loop, receiving data of car's velocity and process them */
 	while(true) {
@@ -231,43 +234,28 @@ int main(int argc, char **argv)
 			currSample = timer.now() - velResponses[0][10] ; /// - receiveTime 1st
 			double prevCmd = velResponses.back()[12];
 			double prevVel = velResponses.back()[2];
-			velEstimated = velX + prevCmd/5*circleTime2; 
+			velEstimated = velX; 
 		}
 		
 		ROS_INFO("Gonna go to scheduled points");
 		/// Scheduled points
-		if(currSample <= 1.8)
+		if(currSample <= Tstable1)
 			velSet = setPoint1;
-		if(velSet == setPoint1)
-		{
-			if(velEstimated - velSet > -stdErr && velEstimated - velSet < stdErr)
+		if(calFlag1 == false && currSample >= Tstable1) 
 			{
-				if(resetFlag == true)  
-				{
-					resetFlag = false;
-					errorCount = 0;
-					stableTimer.start();
-				}
-				else {};
-			}
-			else 
-			{
-				errorCount +=1;
-				if(errorCount >=2) resetFlag = true;
-			}
-			if(resetFlag == false && stableTimer.elapse() >= stdTime)
-			{
+				Dstable = x;
+				calFlag1 = true;
+				ROS_INFO("Start setPoint2 at %.3lf, pos: %f", timer.now(), x);
 				velSet = setPoint2;
-				Dstable = x; /// Generally, it should be sqrt(x*2 + y*2)
-				stableTimer.start();
 			}
-		}
-		ROS_INFO("Gonna calculate Dstable");
 		/// Calculate stable distance
-		if(stableTimer.elapse() == Tstable && Tstable > 0)
+		if(Tstable2 > 0 && currSample >= Tstable1 + Tstable2 && calFlag2 == false)
 		{
 			Dstable = x - Dstable;
-		    fDstable << setPoint1 << "\t" << setPoint2 << "\t" << Tstable << "\t" << 	Dstable <<endl;
+			calFlag2 = true;
+			ROS_INFO("Calculate stable distance at %.3lf, pos: %f, Tstable: %.3lf, Distance: %f", timer.now(), x, Tstable2, Dstable);
+			fDstable << "-------2 setPoints--------" << endl;
+			fDstable << setPoint1 << "\t" << setPoint2 << "\t" << Tstable2 << "\t" << Dstable << endl;;
 		}
 
 		

@@ -3,7 +3,7 @@
    	* 3 Setpoint velocities
 		* pid controler
    	* aggresively calculate stable distance from setPoint1 to setPoint2 and setPoint1 to setPoint3 in total. 
-	last edited 13:50PM_21/08/2014 by tynguyen
+	last edited 5:00PM_25/08/2014 by tynguyen
 	tynguyen@unist.ac.kr
 
 */
@@ -45,8 +45,6 @@ void adjustPID(PID &pid, double &kp, double &ki)
 
 /// Global constants
 int SERVICE_PORT = 21234;
-double stdErr = 0.25; /// standard velocity error to be considered a velocity
-double stdTime = 0.8; /// standard time to be considered stable 
 
 int main(int argc, char **argv)
 {
@@ -79,39 +77,28 @@ int main(int argc, char **argv)
 
 	/* Running condition: setpoints*/
 	double velSet = 0;
-	double setPoint1, setPoint2;
+	double setPoint1, setPoint2, setPoint3;
 	double kp = 70;
 	double ki = 65;
 	double cmdPrev = 0;
-	double Tstable = 0;
-	double Tchange = 1.5; /// When to change from setpoin1 -> setpoint2
-	if (argc == 5)
+	double Tstable1 = 0;
+	double Tstable2 = 0;
+	double Tstable3 = 0;
+	double setPoint4 = 0; /// Any velocity
+	if (argc == 7)
 	{
 		sscanf(argv[1], "%lf", &setPoint1);
 		sscanf(argv[2], "%lf", &setPoint2);
-		sscanf(argv[3], "%lf", &Tchange);
-		sscanf(argv[4], "%lf", &Tstable);
-	}
-
-	else if(argc == 3)
-	{
-		sscanf(argv[1], "%lf", &setPoint1);
-		sscanf(argv[2], "%lf", &setPoint2);
-		ROS_INFO("No stable time input, no change time input -> no stable distance computation, start change setpoint at %lf!", Tchange);
-	}
-	
-	else if(argc == 4)
-	{
-		sscanf(argv[1], "%lf", &setPoint1);
-		sscanf(argv[2], "%lf", &setPoint2);
-		sscanf(argv[3], "%lf", &Tchange);
-		ROS_INFO("No stable time input -> no stable distance computation!");
+		sscanf(argv[3], "%lf", &setPoint3);
+		sscanf(argv[4], "%lf", &Tstable1);
+		sscanf(argv[5], "%lf", &Tstable2);
+		sscanf(argv[6], "%lf", &Tstable3);
 	}
 
 	else 
 	{
 		ROS_INFO("Two many or less arguments");
-		ROS_INFO("Right usage is: carRun setPoint1 setPoint2 changeTime StableTime");
+		ROS_INFO("Right usage is: carRun setPoint1 setPoint2 setPoint3 Tstable1 Tstable2 Tstable3 ");
 		return 0;
 	}
 
@@ -143,10 +130,9 @@ int main(int argc, char **argv)
 	vector<vector<double> > velResponses;
 
 	/// Stable distance 
-	double Dstable = 0;
-	bool calFlag1 = false, calFlag2 = false; /// Flag to notice when calculating
-	double point2At; /// Time to start running at setpoint2 
-	
+	double Dstable = 0, x0 = 0; // x0: offset position at the beginning
+	bool calFlag1 = false, calFlag2 = false, calFlag3 = false; /// Flag to notice when calculating
+ 		
 	ofstream fDstable;
 	fDstable.open("Dstable.csv", ios::app);
     if(fDstable.fail())
@@ -240,31 +226,39 @@ int main(int argc, char **argv)
 		
 		ROS_INFO("Gonna go to scheduled points");
 		/// Scheduled points
-		if(currSample < Tchange && calFlag1 == false)
+		if(currSample == 0)
+		{
+			ROS_INFO("Start setpoint1 at %.3lf and position: %f", timer.now(), x);
+			x0 = x;
+		}
+		if(currSample < Tstable1)
 			velSet = setPoint1;
-		else if(calFlag1 == false && velSet == setPoint1)
+		if(calFlag1 == false && currSample >= Tstable1)
 		{
 			velSet = setPoint2;
-			Dstable = x; /// Generally, it should be sqrt(x*2 + y*2)
-			point2At = timer.now();
-			ROS_INFO("Start setpoint2 at %.3lf and position: %f",point2At,x);
+			Dstable = x - x0; /// Generally, it should be sqrt(x*2 + y*2)
+			fDstable << "-------3 setPoints-------" <<endl;
+		    fDstable << 0 << "\t" << setPoint1 << "\t" << Tstable1 << "\t" << 	Dstable <<endl;
+			ROS_INFO("Start setpoint2 at %.3lf and position: %f, Dstable1: %f", timer.now(), x, Dstable);
 			calFlag1 = true;
 		}
-		if(calFlag1 == true)
-			ROS_INFO("CalFlag1 now is true");
-		else 
-			ROS_INFO("CalFlag1 now is false");
-		if(timer.now() >= (Tstable + point2At) )
-			ROS_INFO("Still less than Tstable");
-		else 
-			ROS_INFO("Bigger than Tstable");
-		/// Calculate stable distance
-		if(calFlag1 == true && timer.now() >= (Tstable + point2At) && Tstable > 0 && calFlag2 == false)
+		
+		if(currSample >= (Tstable1 + Tstable2) && calFlag2 == false)
 		{
-			Dstable = x - Dstable;
-			ROS_INFO("Calculate at %.3lf, position: %f, after stableTime:%.3f  Dstable = %f", timer.now(), x, Tstable, Dstable);
-		   fDstable << setPoint1 << "\t" << setPoint2 << "\t" << Tstable << "\t" << 	Dstable <<endl;
+			Dstable = x - x0;
+			velSet = setPoint3;
+			ROS_INFO("Start setpoint3 at %.3lf and position: %f, Dstable2: %f", timer.now(), x, Dstable);
+		    fDstable << 0 << "\t" << setPoint2 << "\t" << Tstable2 + Tstable1 << "\t" << 	Dstable <<endl;
 			calFlag2 = true;
+		}
+		
+		if(currSample >= (Tstable1 + Tstable2 + Tstable3) && calFlag3 == false)
+		{
+			Dstable = x - x0;
+			velSet = setPoint4;
+			ROS_INFO("End setpoint3 at %.3lf and position: %f, Dstabl3: %f", timer.now(), x, Dstable);
+		    fDstable << 0 << "\t" << setPoint3 << "\t" << Tstable3 + Tstable2 + Tstable1 << "\t" << 	Dstable <<endl;
+			calFlag3 = true;
 		}
 
 		

@@ -250,14 +250,6 @@ int main(int argc, char **argv)
 			ROS_INFO("Start setpoint2 at %.3lf and position: %f",point2At,x);
 			calFlag1 = true;
 		}
-		if(calFlag1 == true)
-			ROS_INFO("CalFlag1 now is true");
-		else 
-			ROS_INFO("CalFlag1 now is false");
-		if(timer.now() >= (Tstable + point2At) )
-			ROS_INFO("Still less than Tstable");
-		else 
-			ROS_INFO("Bigger than Tstable");
 		/// Calculate stable distance
 		if(calFlag1 == true && timer.now() >= (Tstable + point2At) && Tstable > 0 && calFlag2 == false)
 		{
