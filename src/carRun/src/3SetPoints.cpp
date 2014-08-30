@@ -63,7 +63,7 @@ int main(int argc, char **argv)
 	ros::Publisher strPub = n.advertise<std_msgs::Float64>("controlS", 64);
 	ros::Publisher idlePub = n.advertise<std_msgs::Float64>("controlI", 64);
 
-	ros::Rate loop_rate(100);
+	ros::Rate loop_rate(10);
 
 	int circleNum = 0;
 	std_msgs::Float64 vel;
@@ -314,6 +314,19 @@ int main(int argc, char **argv)
 	vel.data = 0;
 	ROS_INFO("FORCE: %f", vel.data);
 	velPub.publish(vel);
+	loop_rate.sleep();
+	if(velX  >= 1.0)
+	{
+		vel.data = -20;
+		ROS_INFO("FORCE: %f", vel.data);
+		velPub.publish(vel);
+		loop_rate.sleep();
+		loop_rate.sleep();
+		vel.data = 0;
+		ROS_INFO("FORCE: %f", vel.data);
+		velPub.publish(vel);
+		loop_rate.sleep();
+	}
 	
 	cout<<"****End of the program****"<<endl;
 	cout<<"Successful frames: "<<countNum<<endl;

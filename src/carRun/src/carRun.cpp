@@ -312,7 +312,19 @@ int main(int argc, char **argv)
 	vel.data = 0;
 	ROS_INFO("FORCE: %f", vel.data);
 	velPub.publish(vel);
-	
+	if(velSet > 1.0)
+    {
+		loop_rate.sleep();
+		vel.data = -11;
+		ROS_INFO("FORCE: %f", vel.data);
+		velPub.publish(vel);
+		loop_rate.sleep();
+		loop_rate.sleep();
+		loop_rate.sleep();
+		vel.data = 0;
+		ROS_INFO("FORCE: %f", vel.data);
+		velPub.publish(vel);
+	}
 	cout<<"****End of the program****"<<endl;
 	cout<<"Successful frames: "<<countNum<<endl;
 	cout<<"Error frames (bad gotten package from client): "<<errorNum<<endl;

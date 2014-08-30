@@ -3,7 +3,7 @@
 		* Only one setpoint velocity
    	* pid controler
    	* stable distance calculation
-	last edited 13:31PM_21/08/2014 by tynguyen
+	last edited 11:30PM_31/08/2014 by tynguyen
 	tynguyen@unist.ac.kr
 
 */
@@ -48,12 +48,12 @@ int SERVICE_PORT = 21234;
 
 int main(int argc, char **argv)
 {
-	double addVel = 0.05;
+	
 	/* server setup */
 	UdpServer server(SERVICE_PORT);
 	server.connect();
-   int timeout = 1000000; /// 1 second
-		
+   	int timeout = 10000000; /// 10 000 000 miliseconds
+	int msgcnt = 1; /// the number of packages	
 	/* Setup ROS control*/	
 	ros::init(argc, argv, "carRun");
 
@@ -63,7 +63,7 @@ int main(int argc, char **argv)
 	ros::Publisher strPub = n.advertise<std_msgs::Float64>("controlS", 64);
 	ros::Publisher idlePub = n.advertise<std_msgs::Float64>("controlI", 64);
 
-	ros::Rate loop_rate(100);
+	ros::Rate loop_rate(70);
 
 	int circleNum = 0;
 	std_msgs::Float64 vel;
@@ -149,7 +149,7 @@ int main(int argc, char **argv)
 		ROS_INFO("Start new frame at %.3f", timer.now() );	
 		if(circleNum > 0)   /// mean that from the second time of receving, just wait a few miliseconds
 			buf = server.receive(timeout);
-		else buf = server.receive();
+		else buf = server.receive(0);
 		double receiveTime = timer.now();
 
 		circleNum += 1;
@@ -187,12 +187,14 @@ int main(int argc, char **argv)
 		/// If message is wrong, do not save, just continue running
 		if(startS.compare(string("start") ) != 0 || endS.compare(string("end")) != 0 ) /// string is bad
 		{
-				cout<<"Gotten string is bad!! It is: "<<isBuf<<endl;
+				cout<<"Gotten string is bad!! It is: "<<startS << endS<<endl;
 				errorNum +=1;
-				continue;
+				/* Now, based on previous position, decide whether stop car or not*/
+				if(velResponses.size() > 0 && velResponses.back()[4] >= 490)
+					break;
+				else continue;
 		}
 
-		
 		/* Compansate vision-based velocity calculation time delay */
 		if(velResponses.size() >= 2) 
 		{
@@ -216,12 +218,13 @@ int main(int argc, char **argv)
 		{
 			currSample = 0;
 			velEstimated = 0; }
-		else
+		else /// Already one sample
 		{
 			currSample = timer.now() - velResponses[0][10] ; /// - receiveTime 1st
 			double prevCmd = velResponses.back()[12];
 			double prevVel = velResponses.back()[2];
-			velEstimated = velX + prevCmd/5*circleTime2; 
+			///velEstimated = velX + prevCmd/5*circleTime2; 
+			velEstimated = velX;
 		}
 		
 		ROS_INFO("Gonna go to scheduled points");
@@ -295,7 +298,18 @@ int main(int argc, char **argv)
 	vel.data = 0;
 	ROS_INFO("FORCE: %f", vel.data);
 	velPub.publish(vel);
-	
+	loop_rate.sleep();
+	if(velX  >= 1.0)
+	{
+		vel.data = -20;
+		ROS_INFO("FORCE: %f", vel.data);
+		velPub.publish(vel);
+		loop_rate.sleep();
+		loop_rate.sleep();
+		vel.data = 0;
+		ROS_INFO("FORCE: %f", vel.data);
+		velPub.publish(vel);
+	}
 	cout<<"****End of the program****"<<endl;
 	cout<<"Successful frames: "<<countNum<<endl;
 	cout<<"Error frames (bad gotten package from client): "<<errorNum<<endl;

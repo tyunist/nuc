@@ -1,6 +1,6 @@
 /*
  * File: UdpServer.cpp
- * Last modified on Monday, 04 August  12:10 2014 by tynguyen
+ * Last modified on 31 August  10:30PM 2014 by tynguyen
  *     
  * -----------------------------------------------------
  * This interface provides interface to communicate with the client in order to receive information.
@@ -70,8 +70,36 @@ int UdpServer:: connect()
 
 			
 			return 1;
- 		}
- 		
+}
+
+/* Check whether buffer has data to read*/
+bool UdpServer:: isReadable(int usec)
+{
+	fd_set socketReadSet;
+	FD_ZERO(&socketReadSet);
+	FD_SET(this->fd, &socketReadSet);
+
+	// Setup timeout
+	struct timeval tv;
+	if( usec ) {
+	tv.tv_sec   = usec / 1000000;
+	tv.tv_usec = (usec % 1000000);
+	} else {
+	tv.tv_sec  = 0;
+	tv.tv_usec = 0;
+	} // end if
+
+
+
+	// Select on our Socket Description
+	if( select(this->fd+1,&socketReadSet,0,0,&tv) == -1 ) {
+	perror("select");
+	exit(1);
+	}
+
+	return FD_ISSET(this->fd,&socketReadSet) != 0;
+
+} // end isReadable
  		
 /* Receive message from the client
  * timout is a variable that clarify whether receiver has timeout or not. Default is 0, meaning that 
@@ -86,8 +114,7 @@ char* UdpServer:: receive(int timeout)
     if(timeout > 0)   /// mean that from the second time of receving, just wait a few miliseconds
 		setsockopt(this->fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(struct timeval) );	
  	printf("waiting on port %d\n", this->port);
-	this->recvlen = recvfrom(this->fd, this->buf, this->buflen, 0, 
-							 (struct sockaddr *)&this->remaddr, &this->slen);
+	this->recvlen = recvfrom(this->fd, this->buf, this->buflen, 0, (struct sockaddr *)&this->remaddr, &this->slen);
 	if (this->recvlen > 0) {
 		this->buf[this->recvlen] = 0;
 		printf("Received message: \"%s\" (%d bytes)\n", this->buf, this->recvlen);
@@ -97,12 +124,37 @@ char* UdpServer:: receive(int timeout)
 		printf("NO data. Going to stop by server!!!");
 		sprintf(this->buf, string("stop").c_str());
 	}
+	
+	/* Read till the latest package */
+	int k = 1;
+	while(isReadable(2000)) 
+	{
+		printf("Can read continuously \n");
+		this->recvlen = recvfrom(this->fd, this->buf, this->buflen, 0, (struct sockaddr *)&this->remaddr, &this->slen);
+		if(this->recvlen > 0)
+			printf("Add message %d is: %s \n", k++, this->buf);
+		else printf("No add message! \n");
+	}
+		
+	printf("No thing left to read \n");
 	return this->buf;				
 }
- 		
- 		
+ 	
+
+/* Acknowledge package receiving to client*/
+void UdpServer:: ack(int msgcnt)
+{
+	///Send acknowledge to client
+	sprintf(reinterpret_cast<char*>(this->buf), "ack %d", msgcnt);
+	printf("Sending response to client: \"%s\"\n", this->buf);
+	if (sendto(this->fd, this->buf, strlen(reinterpret_cast<const char*>(this->buf) ), 0, (struct sockaddr *)&this->remaddr, this->slen) );
+
+}
+
+
+
 /* Close the socket */
- 		void UdpServer:: disConnect()
- 		{
- 			close(this->fd);
- 		}
+void UdpServer:: disConnect()
+{
+	close(this->fd);
+}
