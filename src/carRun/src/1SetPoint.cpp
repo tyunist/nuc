@@ -52,8 +52,7 @@ int main(int argc, char **argv)
 	/* server setup */
 	UdpServer server(SERVICE_PORT);
 	server.connect();
-   	int timeout = 10000000; /// 10 000 000 miliseconds
-	int msgcnt = 1; /// the number of packages	
+   	int timeout = 900000; /// 800 000  microseconds
 	/* Setup ROS control*/	
 	ros::init(argc, argv, "carRun");
 
@@ -63,7 +62,7 @@ int main(int argc, char **argv)
 	ros::Publisher strPub = n.advertise<std_msgs::Float64>("controlS", 64);
 	ros::Publisher idlePub = n.advertise<std_msgs::Float64>("controlI", 64);
 
-	ros::Rate loop_rate(70);
+	ros::Rate loop_rate(120);
 
 	int circleNum = 0;
 	std_msgs::Float64 vel;
@@ -177,7 +176,6 @@ int main(int argc, char **argv)
 			ROS_INFO("STOP by client!!!Stopping...");
 			break;
 		}
-
 		ROS_INFO("Message implies a command to run");	
 		/* Now, with each received package, we need to estimate the current
 		velocity based on sent velocity */
@@ -187,13 +185,14 @@ int main(int argc, char **argv)
 		/// If message is wrong, do not save, just continue running
 		if(startS.compare(string("start") ) != 0 || endS.compare(string("end")) != 0 ) /// string is bad
 		{
-				cout<<"Gotten string is bad!! It is: "<<startS << endS<<endl;
+				cout<<"Gotten string is bad!! It is: "<<isBuf<<endl;
 				errorNum +=1;
 				/* Now, based on previous position, decide whether stop car or not*/
-				if(velResponses.size() > 0 && velResponses.back()[4] >= 490)
-					break;
-				else continue;
+				///if(velResponses.size() > 0 && velResponses.back()[4] >= 490)
+				///	break;
+				///else {};
 		}
+        
 
 		/* Compansate vision-based velocity calculation time delay */
 		if(velResponses.size() >= 2) 

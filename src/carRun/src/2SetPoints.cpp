@@ -54,7 +54,7 @@ int main(int argc, char **argv)
 	/* server setup */
 	UdpServer server(SERVICE_PORT);
 	server.connect();
-   int timeout = 1000000; /// 1 second
+   	int timeout = 1000000; /// miliseconds
 		
 	/* Setup ROS control*/	
 	ros::init(argc, argv, "carRun");
@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 	ros::Publisher strPub = n.advertise<std_msgs::Float64>("controlS", 64);
 	ros::Publisher idlePub = n.advertise<std_msgs::Float64>("controlI", 64);
 
-	ros::Rate loop_rate(10);
+	ros::Rate loop_rate(120);
 
 	int circleNum = 0;
 	std_msgs::Float64 vel;
@@ -202,7 +202,10 @@ int main(int argc, char **argv)
 		{
 				cout<<"Gotten string is bad!! It is: "<<isBuf<<endl;
 				errorNum +=1;
-				continue;
+				/* Now, based on previous position, decide whether stop car or not*/
+				if(velResponses.size() > 0 && velResponses.back()[4] >= 490)
+					break;
+				else continue;
 		}
 
 		
@@ -222,7 +225,7 @@ int main(int argc, char **argv)
 				velEstimated = velX + circleTime2*(prevVelEstimated - prevVel)*prevCmd/sePrevCmd;
 			/// In general, it should be vel rather than velX
 			
-		   /// Average velocity
+		    /// Average velocity
 			velEstimated = (velEstimated + prevVelEstimated)/ 2.0;
 		}	
 		else if(velResponses.size() == 0)

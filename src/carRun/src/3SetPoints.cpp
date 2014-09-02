@@ -48,11 +48,10 @@ int SERVICE_PORT = 21234;
 
 int main(int argc, char **argv)
 {
-	double addVel = 0.05;
 	/* server setup */
 	UdpServer server(SERVICE_PORT);
 	server.connect();
-   int timeout = 1000000; /// 1 second
+    int timeout = 1000000; /// milliseconds
 		
 	/* Setup ROS control*/	
 	ros::init(argc, argv, "carRun");
@@ -63,7 +62,7 @@ int main(int argc, char **argv)
 	ros::Publisher strPub = n.advertise<std_msgs::Float64>("controlS", 64);
 	ros::Publisher idlePub = n.advertise<std_msgs::Float64>("controlI", 64);
 
-	ros::Rate loop_rate(10);
+	ros::Rate loop_rate(120);
 
 	int circleNum = 0;
 	std_msgs::Float64 vel;
@@ -189,7 +188,10 @@ int main(int argc, char **argv)
 		{
 				cout<<"Gotten string is bad!! It is: "<<isBuf<<endl;
 				errorNum +=1;
-				continue;
+				/* Now, based on previous position, decide whether stop car or not*/
+				if(velResponses.size() > 0 && velResponses.back()[4] >= 490)
+					break;
+				else continue;
 		}
 
 		
@@ -221,7 +223,7 @@ int main(int argc, char **argv)
 			currSample = timer.now() - velResponses[0][10] ; /// - receiveTime 1st
 			double prevCmd = velResponses.back()[12];
 			double prevVel = velResponses.back()[2];
-			velEstimated = velX + prevCmd/5*circleTime2; 
+			velEstimated = velX;
 		}
 		
 		ROS_INFO("Gonna go to scheduled points");

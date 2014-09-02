@@ -121,8 +121,10 @@ char* UdpServer:: receive(int timeout)
 	}
 	else 
 	{
+		perror("UDP Server - recvfrom() error");
 		printf("NO data. Going to stop by server!!!");
 		sprintf(this->buf, string("stop").c_str());
+
 	}
 	
 	/* Read till the latest package */
