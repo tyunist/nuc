@@ -171,6 +171,6 @@ add_executable(3SetPoints src/3SetPoints.cpp src/Timer.cpp src/UdpServer.cpp src
 add_executable(keyboardRun src/keyboardRun.cpp src/Timer.cpp src/UdpServer.cpp src/PID.cpp)
 target_link_libraries(carRun ${catkin_LIBRARIES} ${curses++_LIBRARIES})
 target_link_libraries(1SetPoint ${catkin_LIBRARIES} ${curses++_LIBRARIES})
-target_link_libraries(2SetPoint ${catkin_LIBRARIES} ${curses++_LIBRARIES})
-target_link_libraries(3SetPoint ${catkin_LIBRARIES} ${curses++_LIBRARIES})
+target_link_libraries(2SetPoints ${catkin_LIBRARIES} ${curses++_LIBRARIES})
+target_link_libraries(3SetPoints ${catkin_LIBRARIES} ${curses++_LIBRARIES})
 target_link_libraries(keyboardRun ${catkin_LIBRARIES} ${curses++_LIBRARIES})

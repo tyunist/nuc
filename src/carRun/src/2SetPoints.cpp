@@ -3,7 +3,7 @@
    	* 2 setpont velocities
 		* pid controler
    	* Calculate stable distance from setPoin1 to setPoint2 
-	last edited 13:49PM_21/08/2014 by tynguyen
+	last edited 13:49PM, 4/09/2014 by tynguyen
 	tynguyen@unist.ac.kr
 
 */
@@ -85,6 +85,7 @@ int main(int argc, char **argv)
 	double cmdPrev = 0;
 	double Tstable2 = 0;
 	double Tstable1 = 1.5; /// When to change from setpoin1 -> setpoint2
+	int zeroCount = 0; /// No of 0-velocity sample
 	if (argc == 5)
 	{
 		sscanf(argv[1], "%lf", &setPoint1);
@@ -265,7 +266,9 @@ int main(int argc, char **argv)
 		/* Control car with new velocity */
 		/// Get command
 		double velDelta = velEstimated - velSet - 0.05;
-		
+		if(velSet == 0 && velEstimated < 0.02 && velEstimated > -0.02)
+			zeroCount ++;
+		if(zeroCount >= 10) break;
 		/// Adjust PID parameters after cmd <= 0
 		if( currSample > 1.0)
 		{};
